@@ -108,3 +108,6 @@ summary(hdma_df)
 
 # save file for future usage
 save(hdma_df, file = "hdma_processed.Rdata")
+
+# Load file to continue work
+load(file = "hdma_processed.Rdata")
