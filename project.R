@@ -82,3 +82,29 @@ setwd(dirname(getActiveDocumentContext()$path))
 
 load(file = "hdma_cleaned.Rdata")
 
+hdma_df <- hdma_df_c
+
+# Let's do PCA of continuous variables and see if there are any variables correlated so we can remove them or substitude with another
+library(FactoMineR)
+library(factoextra)
+pca.hmda <- PCA(hdma_df[,1:9])
+fviz_pca_var(pca.hmda)
+
+# From PCA we observed that applicant_income and loan amount are highly correlated so we can remove them and substitude with another variable
+
+# Pretty much number of years it would take a payer to pay a loan fully assuming that he pays 20% of his gross anual income on loan
+hdma_df$payable_period <- hdma_df$loan_amount_000s/(0.20*hdma_df$applicant_income_000s)
+
+require(dplyr)
+#swap columns
+hdma_df$loan_amount_000s <- hdma_df$payable_period
+hdma_df <- rename(hdma_df, "payable_period" = "loan_amount_000s")
+
+# remove 2 columns which we used to calculate payable_period
+hdma_df <- subset(hdma_df, select = -c(applicant_income_000s))
+hdma_df <- hdma_df[,-ncol(hdma_df)]
+
+summary(hdma_df)
+
+# save file for future usage
+save(hdma_df, file = "hdma_processed.Rdata")
