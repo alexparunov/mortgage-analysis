@@ -1,7 +1,7 @@
 # Final Project. Machine Learning
 # Link to data set: https://www.kaggle.com/miker400/washington-state-home-mortgage-hdma2016
 # Description of dataset: https://cfpb.github.io/api/hmda/fields.html
-# Authors: Alexander Parunov, Mathieu Chiavassa, Wang Yang
+# Authors: Alexander Parunov, Mathieu Chiavassa, Wang Yang Ye
 
 if(!require(rstudioapi)) {
   install.packages("rstudioapi")
@@ -111,3 +111,63 @@ save(hdma_df, file = "hdma_processed.Rdata")
 
 # Load file to continue work
 load(file = "hdma_processed.Rdata")
+
+# Transform levels of active varible for easy interpretation
+levels(hdma_df$action_taken_name) <- c("approved","denied","withdrawn","closed","originated","purchased","preapproved","predenied")
+
+# Let's construct dataset which has almost equal amount of all classes, but reduced size
+hdma_subset <- hdma_df[hdma_df$action_taken_name == "predenied",]
+hdma_subset <- rbind(hdma_df[hdma_df$action_taken_name == "preapproved",], hdma_subset)
+hdma_subset <- rbind(hdma_df[hdma_df$action_taken_name == "approved",], hdma_subset)
+hdma_subset <- rbind(hdma_df[hdma_df$action_taken_name == "closed",], hdma_subset)
+
+# Gettin random 10k individuals from each classes given below
+set.seed(953)
+denied_subset <- hdma_df[hdma_df$action_taken_name == "denied",]
+
+# Take 25% of this dataset
+denied_subset <- denied_subset[sample(nrow(denied_subset),floor(0.25*nrow(denied_subset))),]
+
+withdrawn_subset <- hdma_df[hdma_df$action_taken_name == "withdrawn",]
+withdrawn_subset <- withdrawn_subset[sample(nrow(withdrawn_subset),floor(0.25*nrow(withdrawn_subset))),]
+
+purchased_subset <- hdma_df[hdma_df$action_taken_name == "purchased",]
+purchased_subset <- purchased_subset[sample(nrow(purchased_subset), floor(0.25*nrow(purchased_subset))),]
+
+hdma_subset <- rbind(denied_subset, hdma_subset)
+hdma_subset <- rbind(withdrawn_subset, hdma_subset)
+hdma_subset <- rbind(purchased_subset, hdma_subset)
+
+# rest are originated class individuals to fill 100k subset
+originated_subset <- hdma_df[hdma_df$action_taken_name == "originated",]
+originated_subset <- originated_subset[sample(nrow(originated_subset), 100000-nrow(hdma_subset)),]
+
+hdma_subset <- rbind(originated_subset, hdma_subset)
+
+# Save subset
+save(hdma_subset, file = "hdma_subset.Rdata")
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+
+load("hdma_subset.Rdata")
+
+n_total <- round(nrow(hdma_subset))
+n_train <- floor(n_total * 2/3)
+n_test <- n_total - n_train
+
+set.seed(739)
+train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
+
+train_set <- hdma_subset[train_indexes,]
+test_set <- hdma_subset[-train_indexes,]
+
+library(e1071)
+library(rpart)
+
+train_set <- hdma_df[train_indexes,]
+test_set <- hdma_df[-train_indexes,]
+
+svm.model <- svm(action_taken_name ~ ., data = train_set, scale = TRUE, cost = 100, gamma = 5)
+svm.pred <- predict(svm.model, test_set[,-ncol(hdma_df)])
+
+pred.table <- table(pred = svm.pred, true = test_set[,ncol(hdma_df)])
