@@ -157,25 +157,33 @@ save(hdma_subset, file = "hdma_subset.Rdata")
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
+# Load subset for training/testing
 load("hdma_subset.Rdata")
+hdma_subset <- subset(hdma_subset, select=-county_name)
 
-n_total <- round(nrow(hdma_subset))
+hdma_subset[1:8] <- scale(hdma_subset[1:8])
+
+# Use one-hot encoding to encode categorical variables
+encoded_m <- data.frame(model.matrix(~., hdma_subset[,-ncol(hdma_subset)]), action_taken_name=hdma_subset$action_taken_name)
+
+# This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
+# We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
+encoded_m <- encoded_m[,-1]
+
+n_total <- round(nrow(encoded_m))
 n_train <- floor(n_total * 2/3)
 n_test <- n_total - n_train
 
 set.seed(739)
 train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
 
-train_set <- hdma_subset[train_indexes,]
-test_set <- hdma_subset[-train_indexes,]
+train_set <- encoded_m[train_indexes,]
+test_set <- encoded_m[-train_indexes,]
 
 library(e1071)
 library(rpart)
 
-train_set <- hdma_df[train_indexes,]
-test_set <- hdma_df[-train_indexes,]
+svm.model <- svm(action_taken_name ~ ., data = train_set, scale = TRUE)
+svm.pred <- predict(svm.model, test_set[,-ncol(encoded_m)])
 
-svm.model <- svm(action_taken_name ~ ., data = train_set, scale = TRUE, cost = 100, gamma = 5)
-svm.pred <- predict(svm.model, test_set[,-ncol(hdma_df)])
-
-pred.table <- table(pred = svm.pred, true = test_set[,ncol(hdma_df)])
+pred.table <- table(pred = svm.pred, true = test_set[,ncol(encoded_m)])
