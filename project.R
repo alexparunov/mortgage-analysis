@@ -164,10 +164,11 @@ hdma_subset <- subset(hdma_subset, select=-county_name)
 hdma_subset[1:8] <- scale(hdma_subset[1:8])
 
 # Use one-hot encoding to encode categorical variables
-# Get all categorical variables names without the response variable
+# Get all variables names without the response variable
 vars = colnames(hdma_subset)[1:(ncol(hdma_subset)-1)]
 f <- paste('~ 0+  ', paste(vars, collapse = '  -1 +'))
 encoded_m <- data.frame(model.matrix(~., hdma_subset[,-ncol(hdma_subset)]), action_taken_name=hdma_subset$action_taken_name)
+# It will not produce Intercept
 encoded_m <- data.frame(model.matrix(as.formula(f), hdma_subset[,-ncol(hdma_subset)]), action_taken_name=hdma_subset$action_taken_name)
 
 # This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
