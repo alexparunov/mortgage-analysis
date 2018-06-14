@@ -171,6 +171,14 @@ encoded_m <- data.frame(model.matrix(~., hdma_subset[,-ncol(hdma_subset)]), acti
 # It will not produce Intercept
 encoded_m <- data.frame(model.matrix(as.formula(f), hdma_subset[,-ncol(hdma_subset)]), action_taken_name=hdma_subset$action_taken_name)
 
+# It will do k modality -> k binary vabirables transformation
+library(onehot)
+encoder <- onehot(hdma_subset[,-ncol(hdma_subset)])
+encoded_m1 <- predict(encoder, hdma_subset[,-ncol(hdma_subset)])
+encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
+
+# Warning below line encoded_m[,-1], no longer needed
+
 # This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
 # We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
 encoded_m <- encoded_m[,-1]
