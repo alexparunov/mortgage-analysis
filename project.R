@@ -172,8 +172,28 @@ encoded_m1 <- predict(encoder, hdma_subset[,-ncol(hdma_subset)])
 # We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
 encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
 
-# This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
-# We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
+library(FactoMineR)
+pca <- PCA(encoded_m, quali.sup = ncol(encoded_m), graph = FALSE)
+
+Psi <- pca$ind$coord
+
+dist.matr <- dist(Psi, method = "euclidean")
+hc.matr <- hclust(dist.matr, method = "ward.D2")
+n <- length(hc.matr$height)
+barplot(hc.matr$height[(n-40):n], ylim = c(0, max(round(hc.matr$height+2))), 
+        main = "Aggregated distance at each iteration")
+
+# From barplot we see that aggregated distance started increasing rapidly at 200, so
+# number of classes we select will be 200. But we know that we have 8 in original one, so let's stick to it.
+nclasses <- length(levels(encoded_m$hdma_subset.action_taken_name))
+ct <- cutree(hc.matr, k = nclasses)
+cdg <- aggregate(as.data.frame(Psi), list(ct), mean)[,-1]
+
+k8 <- kmeans(x = Psi, centers = cdg)
+
+# Plot clusters
+plot(Psi[,1], Psi[,2], col = as.factor(k7$cluster), xlab = "Dim1", ylab = "Dim2",
+     pch=20, main = "Clusters of Individuals")
 
 
 n_total <- round(nrow(encoded_m))
