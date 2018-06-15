@@ -163,25 +163,18 @@ hdma_subset <- subset(hdma_subset, select=-county_name)
 
 hdma_subset[1:8] <- scale(hdma_subset[1:8])
 
-# Use one-hot encoding to encode categorical variables
-# Get all variables names without the response variable
-vars = colnames(hdma_subset)[1:(ncol(hdma_subset)-1)]
-f <- paste('~ 0+  ', paste(vars, collapse = ' +'))
-encoded_m <- data.frame(model.matrix(~., hdma_subset[,-ncol(hdma_subset)]), action_taken_name=hdma_subset$action_taken_name)
-# It will not produce Intercept
-encoded_m <- data.frame(model.matrix(as.formula(f), hdma_subset[,-ncol(hdma_subset)]), action_taken_name=hdma_subset$action_taken_name)
-
 # It will do k modality -> k binary vabirables transformation
 library(onehot)
 encoder <- onehot(hdma_subset[,-ncol(hdma_subset)])
 encoded_m1 <- predict(encoder, hdma_subset[,-ncol(hdma_subset)])
-encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
-
-# Warning below line encoded_m[,-1], no longer needed
 
 # This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
 # We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
-encoded_m <- encoded_m[,-1]
+encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
+
+# This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
+# We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
+
 
 n_total <- round(nrow(encoded_m))
 n_train <- floor(n_total * 2/3)
@@ -196,7 +189,7 @@ test_set <- encoded_m[-train_indexes,]
 library(e1071)
 library(rpart)
 
-svm.model <- svm(action_taken_name ~ ., data = train_set, scale = TRUE)
+svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = TRUE)
 svm.pred <- predict(svm.model, test_set[,-ncol(encoded_m)])
 
 pred.table <- table(pred = svm.pred, true = test_set[,ncol(encoded_m)])
