@@ -112,7 +112,15 @@ save(hdma_df, file = "hdma_processed.Rdata")
 # Load file to continue work
 load(file = "hdma_processed.Rdata")
 
-# Transform levels of active varible for easy interpretation
+# Transform levels of active varible for easy interpretation. Initial classes are following:
+# 1) Application approved but not accepted
+# 2) Application denied by financial institution
+# 3) Application withdrawn by applicant
+# 4) File closed for incompleteness
+# 5) Loan originated
+# 6) Loan purchased by the institution
+# 7) Preapproval request approved but not accepted
+# 8) Preapproval request denied by financial institution
 levels(hdma_df$action_taken_name) <- c("approved","denied","withdrawn","closed","originated","purchased","preapproved","predenied")
 
 # Let's construct dataset which has almost equal amount of all classes, but reduced size
@@ -177,11 +185,13 @@ pca <- PCA(encoded_m, quali.sup = ncol(encoded_m), graph = FALSE)
 
 Psi <- pca$ind$coord
 
+library(cluster)
 dist.matr <- dist(Psi, method = "euclidean")
+
 hc.matr <- hclust(dist.matr, method = "ward.D2")
 n <- length(hc.matr$height)
-barplot(hc.matr$height[(n-40):n], ylim = c(0, max(round(hc.matr$height+2))), 
-        main = "Aggregated distance at each iteration")
+#barplot(hc.matr$height[(n-40):n], ylim = c(0, max(round(hc.matr$height+2))), 
+ #       main = "Aggregated distance at each iteration")
 
 # From barplot we see that aggregated distance started increasing rapidly at 200, so
 # number of classes we select will be 200. But we know that we have 8 in original one, so let's stick to it.
@@ -192,12 +202,11 @@ cdg <- aggregate(as.data.frame(Psi), list(ct), mean)[,-1]
 k8 <- kmeans(x = Psi, centers = cdg)
 
 # Plot clusters
-plot(Psi[,1], Psi[,2], col = as.factor(k7$cluster), xlab = "Dim1", ylab = "Dim2",
+plot(Psi[,1], Psi[,2], col = as.factor(k8$cluster), xlab = "Dim1", ylab = "Dim2",
      pch=20, main = "Clusters of Individuals")
 
-
 n_total <- round(nrow(encoded_m))
-n_train <- floor(n_total * 2/3)
+n_train <- floor(n_total * 0.8)
 n_test <- n_total - n_train
 
 set.seed(739)
@@ -206,10 +215,22 @@ train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
 train_set <- encoded_m[train_indexes,]
 test_set <- encoded_m[-train_indexes,]
 
+
+# Random Forest classifier
+library(randomForest)
+
+
+
+
+
+# SVM
 library(e1071)
 library(rpart)
 
-svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = TRUE)
+svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
+                 kernel = "radial", gamma = 0.1, cost = 20)
+
 svm.pred <- predict(svm.model, test_set[,-ncol(encoded_m)])
 
 pred.table <- table(pred = svm.pred, true = test_set[,ncol(encoded_m)])
+sum(diag(pred.table))/sum(pred.table)
