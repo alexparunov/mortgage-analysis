@@ -165,11 +165,21 @@ save(hdma_subset, file = "hdma_subset.Rdata")
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
+library(e1071)
+library(rpart)
+
 # Load subset for training/testing
 load("hdma_subset.Rdata")
 hdma_subset <- subset(hdma_subset, select=-county_name)
 
-hdma_subset[1:8] <- scale(hdma_subset[1:8])
+# Transform continous variables
+# Following variables are skewed so we use log-tranformation to reduce it
+for(i in 1:8){
+  if(abs(skewness(hdma_subset[,i])) > 10) {
+    hdma_subset[,i] <- log(hdma_subset[,i])
+  }
+}
+hdma_subset[,1:8] <- scale(hdma_subset[,1:8])
 
 # It will do k modality -> k binary vabirables transformation
 library(onehot)
@@ -180,6 +190,7 @@ encoded_m1 <- predict(encoder, hdma_subset[,-ncol(hdma_subset)])
 # We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
 encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
 
+# We can skip this PCA and clustering and continue with classification models down
 library(FactoMineR)
 pca <- PCA(encoded_m, quali.sup = ncol(encoded_m), graph = FALSE)
 
@@ -190,8 +201,8 @@ dist.matr <- dist(Psi, method = "euclidean")
 
 hc.matr <- hclust(dist.matr, method = "ward.D2")
 n <- length(hc.matr$height)
-#barplot(hc.matr$height[(n-40):n], ylim = c(0, max(round(hc.matr$height+2))), 
- #       main = "Aggregated distance at each iteration")
+barplot(hc.matr$height[(n-40):n], ylim = c(0, max(round(hc.matr$height+2))), 
+        main = "Aggregated distance at each iteration")
 
 # From barplot we see that aggregated distance started increasing rapidly at 200, so
 # number of classes we select will be 200. But we know that we have 8 in original one, so let's stick to it.
@@ -205,6 +216,8 @@ k8 <- kmeans(x = Psi, centers = cdg)
 plot(Psi[,1], Psi[,2], col = as.factor(k8$cluster), xlab = "Dim1", ylab = "Dim2",
      pch=20, main = "Clusters of Individuals")
 
+
+# Split data into 80/20 train/test data and do classification.
 n_total <- round(nrow(encoded_m))
 n_train <- floor(n_total * 0.8)
 n_test <- n_total - n_train
@@ -215,7 +228,6 @@ train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
 train_set <- encoded_m[train_indexes,]
 test_set <- encoded_m[-train_indexes,]
 
-
 # Random Forest classifier
 library(randomForest)
 
@@ -224,8 +236,7 @@ library(randomForest)
 
 
 # SVM
-library(e1071)
-library(rpart)
+
 
 svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
                  kernel = "radial", gamma = 0.1, cost = 20)
