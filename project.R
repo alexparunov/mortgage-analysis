@@ -170,7 +170,7 @@ library(rpart)
 
 # Load subset for training/testing
 load("hdma_subset.Rdata")
-hdma_subset <- subset(hdma_subset, select=-county_name)
+hdma_subset <- remove_columns(hdma_subset, c("county_name"))
 
 # Transform continous variables
 # Following variables are skewed so we use log-tranformation to reduce it
@@ -236,12 +236,64 @@ library(randomForest)
 
 
 # SVM
+gammas <- 2^seq(-3,4)
+svm.models.gammas <- list()
 
+# Train for various gammas for RBF kernel SVC, keepig cost = 10 and gammas varying.
+i <- 1
+for(g in gammas) {
+  svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
+                   kernel = "radial", gamma = g, cost = 10)
+  svm.models[[i]] <- svm.model
+  i <- i+1
+}
 
-svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
-                 kernel = "radial", gamma = 0.1, cost = 20)
+svm.predictions.gammas <- list()
+i <- 1
+for(svm.model in svm.models.gammas) {
+  svm.pred <- predict(svm.model, test_set[,-ncol(encoded_m)])
+  svm.predictions.gammas[[i]] <- svm.pred
+  i <- i+1
+}
 
-svm.pred <- predict(svm.model, test_set[,-ncol(encoded_m)])
+i <- 1
+errors.gammas <- vector(length = length(svm.predictions))
+for(i in 1:length(svm.predictions)) {
+  pred.table <- table(pred = svm.predictions.gammas[[i]], true = test_set[,ncol(encoded_m)])
+  errors.gammas[i] <- 1 - sum(diag(pred.table))/sum(pred.table)
+}
 
-pred.table <- table(pred = svm.pred, true = test_set[,ncol(encoded_m)])
-sum(diag(pred.table))/sum(pred.table)
+costs <- 10^seq(0,3, by = 0.5)
+svm.models.costs <- list()
+
+# Train for various costs for RBF kernel SVC, keepig gamma = 0.05 and costs varying.
+i <- 1
+for(c in costs) {
+  svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
+                   kernel = "radial", gamma = 0.05, cost = c)
+  svm.models.costs[[i]] <- svm.model
+  i <- i+1
+}
+
+svm.predictions.costs <- list()
+i <- 1
+for(svm.model in svm.models.costs) {
+  svm.pred <- predict(svm.model, test_set[,-ncol(encoded_m)])
+  svm.predictions.costs[[i]] <- svm.pred
+  i <- i+1
+}
+
+i <- 1
+errors.costs <- vector(length = length(svm.predictions.costs))
+for(i in 1:length(svm.predictions.costs)) {
+  pred.table <- table(pred = svm.predictions.costs[[i]], true = test_set[,ncol(encoded_m)])
+  errors.costs[i] <- 1 - sum(diag(pred.table))/sum(pred.table)
+}
+
+# After training and testing with various costs and gammas, error is suboptimal with gamma = 0.05 and cost = 10
+# However increase of cost doesn't affect error as much as increase of gamma. Keeping gamma 0.05 is good choice,
+# because we can't make it too small, it will take more time to train.
+
+svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, kernel = "radial", gamma = 0.05, cost = 10)
+svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
+svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_m)])
