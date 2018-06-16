@@ -173,13 +173,16 @@ load("hdma_subset.Rdata")
 hdma_subset <- subset(hdma_subset, select=-county_name)
 
 # Transform continous variables
-# Following variables are skewed so we use log-tranformation to reduce it
+# Some variables are skewed so we use log-tranformation to correct it
+par(mfrow=c(2,4))
 for(i in 1:8){
-  if(abs(skewness(hdma_subset[,i])) > 10) {
-    hdma_subset[,i] <- log(hdma_subset[,i])
-  }
+  plot(density(hdma_subset[, i]), main=colnames(hdma_subset)[i])
+  print(skewness(hdma_subset[, i]))
 }
+hdma_subset$minority_population <- log(hdma_subset$minority_population)
 hdma_subset[,1:8] <- scale(hdma_subset[,1:8])
+# Restore plot style
+par(mfrow=c(1,1))
 
 # It will do k modality -> k binary vabirables transformation
 library(onehot)
