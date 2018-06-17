@@ -91,6 +91,7 @@ pca.hmda <- PCA(hdma_df[,1:9])
 fviz_pca_var(pca.hmda)
 
 # From PCA we observed that applicant_income and loan amount are highly correlated so we can remove them and substitude with another variable
+# However we might also want to leave those two columns and test if results will improve
 
 # Pretty much number of years it would take a payer to pay a loan fully assuming that he pays 20% of his gross anual income on loan
 hdma_df$payable_period <- hdma_df$loan_amount_000s/(0.20*hdma_df$applicant_income_000s)
@@ -105,6 +106,15 @@ hdma_df <- subset(hdma_df, select = -c(applicant_income_000s))
 hdma_df <- hdma_df[,-ncol(hdma_df)]
 
 summary(hdma_df)
+
+# Find outliers for loan amount column
+loan_outliers <- boxplot.stats(hdma_df$loan_amount_000s)$out
+# We select rows where loan amount is less than minimal value of loan outliers
+hdma_df <- hdma_df[hdma_df$loan_amount_000s < min(loan_outliers),]
+
+#We are doing same with income outliers
+income_outliers <- boxplot.stats(hdma_df$applicant_income_000s)$out
+hdma_df <- hdma_df[hdma_df$applicant_income_000s < min(income_outliers),]
 
 # save file for future usage
 save(hdma_df, file = "hdma_processed.Rdata")
@@ -170,7 +180,14 @@ library(rpart)
 
 # Load subset for training/testing
 load("hdma_subset.Rdata")
-hdma_subset <- remove_columns(hdma_subset, c("county_name"))
+hdma_subset <- subset(hdma_subset, select=-c(county_name, rate_spread, co_applicant_sex_name,
+                                             co_applicant_race_name_1, co_applicant_ethnicity_name))
+
+loan_range <- seq(from = 0, to = max(hdma_df$loan_amount_000s)+50-max(hdma_df$loan_amount_000s)%%50, by = 50)
+hdma_subset$loan_amount_range <- cut(hdma_subset$loan_amount_000s, loan_range)
+
+income_range <- seq(from = 0, to = max(hdma_df$applicant_income_000s)+50-max(hdma_subset$applicant_income_000s)%%50, by = 50)
+hdma_subset$income_range <- cut(hdma_subset$applicant_income_000s, income_range)
 
 # Transform continous variables
 # Some variables are skewed so we use log-tranformation to correct it
@@ -179,10 +196,18 @@ for(i in 1:8){
   plot(density(hdma_subset[, i]), main=colnames(hdma_subset)[i])
   print(skewness(hdma_subset[, i]))
 }
+
 hdma_subset$minority_population <- log(hdma_subset$minority_population)
 hdma_subset[,1:8] <- scale(hdma_subset[,1:8])
 # Restore plot style
 par(mfrow=c(1,1))
+
+save(hdma_subset, file = "hdma_subset_norm.Rdata")
+
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+load(file = "hdma_subset_norm.Rdata")
+
+
 
 # It will do k modality -> k binary vabirables transformation
 library(onehot)
@@ -300,3 +325,6 @@ for(i in 1:length(svm.predictions.costs)) {
 svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, kernel = "radial", gamma = 0.05, cost = 10)
 svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
 svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_m)])
+
+# Best accuracy so ar is 56% :(
+sum(diag(svm.pred.table))/sum(svm.pred.table)
