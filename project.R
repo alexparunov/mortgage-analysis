@@ -183,10 +183,10 @@ load("hdma_subset.Rdata")
 hdma_subset <- subset(hdma_subset, select=-c(county_name, rate_spread, co_applicant_sex_name,
                                              co_applicant_race_name_1, co_applicant_ethnicity_name))
 
-loan_range <- seq(from = 0, to = max(hdma_df$loan_amount_000s)+50-max(hdma_df$loan_amount_000s)%%50, by = 50)
+loan_range <- seq(from = 0, to = max(hdma_subset$loan_amount_000s)+50-max(hdma_subset$loan_amount_000s)%%50, by = 50)
 hdma_subset$loan_amount_range <- cut(hdma_subset$loan_amount_000s, loan_range)
 
-income_range <- seq(from = 0, to = max(hdma_df$applicant_income_000s)+50-max(hdma_subset$applicant_income_000s)%%50, by = 50)
+income_range <- seq(from = 0, to = max(hdma_subset$applicant_income_000s)+50-max(hdma_subset$applicant_income_000s)%%50, by = 50)
 hdma_subset$income_range <- cut(hdma_subset$applicant_income_000s, income_range)
 
 # Transform continous variables
@@ -198,7 +198,10 @@ for(i in 1:8){
 }
 
 hdma_subset$minority_population <- log(hdma_subset$minority_population)
-hdma_subset[,1:8] <- scale(hdma_subset[,1:8])
+for(i in 1:8) {
+  hdma_subset[,i] <- (hdma_subset[,i] - min(hdma_subset[,i]))/(max(hdma_subset[,i]) - min(hdma_subset[,i]))
+}
+
 # Restore plot style
 par(mfrow=c(1,1))
 
@@ -209,10 +212,13 @@ load(file = "hdma_subset_norm.Rdata")
 
 
 
+# The column index of response/class variable
+resp_variable <- which(colnames(hdma_subset) == "action_taken_name")
+
 # It will do k modality -> k binary vabirables transformation
 library(onehot)
-encoder <- onehot(hdma_subset[,-ncol(hdma_subset)])
-encoded_m1 <- predict(encoder, hdma_subset[,-ncol(hdma_subset)])
+encoder <- onehot(hdma_subset[,-resp_variable], max_levels = 15)
+encoded_m1 <- predict(encoder, hdma_subset[,-resp_variable])
 
 # This matrix has just numerical values, i.e. we used 1-versus-K, i.e. onehot encoding to encode out dataframe
 # We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
@@ -326,5 +332,6 @@ svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = 
 svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
 svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_m)])
 
-# Best accuracy so ar is 56% :(
+# Best accuracy so ar is 60% :(
 sum(diag(svm.pred.table))/sum(svm.pred.table)
+
