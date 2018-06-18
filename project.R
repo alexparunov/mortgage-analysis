@@ -135,7 +135,8 @@ levels(hdma_df$action_taken_name) <- c("approved","denied","withdrawn","closed",
 
 # Let's construct dataset which has almost same proportion as the original data, but with reduced size (30000)
 # This show us the proportion of each class of response variable
-table(hdma_df$action_taken_name)/nrow(hdma_df)*100
+t <- table(hdma_df$action_taken_name)/nrow(hdma_df)
+t_n <- as.numeric(t)
 
 hdma_subset <- hdma_df[hdma_df$action_taken_name == "predenied",]
 hdma_subset <- rbind(hdma_df[hdma_df$action_taken_name == "preapproved",], hdma_subset)
@@ -143,26 +144,26 @@ hdma_subset <- rbind(hdma_df[hdma_df$action_taken_name == "preapproved",], hdma_
 
 approved_subset <- hdma_df[hdma_df$action_taken_name == "approved",]
 set.seed(953)
-approved_subset <- approved_subset[sample(nrow(approved_subset), floor(0.025*30000)),]
+approved_subset <- approved_subset[sample(nrow(approved_subset), floor(t_n[1]*30000)),]
 hdma_subset <- rbind(approved_subset, hdma_subset)
 
 closed_subset <- hdma_df[hdma_df$action_taken_name == "closed",]
 set.seed(953)
-closed_subset <- closed_subset[sample(nrow(closed_subset), floor(0.039*30000)),]
+closed_subset <- closed_subset[sample(nrow(closed_subset), floor(t_n[4]*30000)),]
 hdma_subset <- rbind(closed_subset, hdma_subset)
 
 # Gettin random 10k individuals from each classes given below
 denied_subset <- hdma_df[hdma_df$action_taken_name == "denied",]
 set.seed(953)
-denied_subset <- denied_subset[sample(nrow(denied_subset), floor(0.14*30000)),]
+denied_subset <- denied_subset[sample(nrow(denied_subset), floor(t_n[2]*30000)),]
 
 withdrawn_subset <- hdma_df[hdma_df$action_taken_name == "withdrawn",]
 set.seed(953)
-withdrawn_subset <- withdrawn_subset[sample(nrow(withdrawn_subset), floor(0.13*30000)),]
+withdrawn_subset <- withdrawn_subset[sample(nrow(withdrawn_subset), floor(t_n[3]*30000)),]
 
 purchased_subset <- hdma_df[hdma_df$action_taken_name == "purchased",]
 set.seed(953)
-purchased_subset <- purchased_subset[sample(nrow(purchased_subset), floor(0.1*30000)),]
+purchased_subset <- purchased_subset[sample(nrow(purchased_subset), floor(t_n[6]*30000)),]
 
 hdma_subset <- rbind(denied_subset, hdma_subset)
 hdma_subset <- rbind(withdrawn_subset, hdma_subset)
@@ -211,6 +212,7 @@ par(mfrow=c(1,1))
 
 save(hdma_subset, file = "hdma_subset_norm.Rdata")
 
+# This data frame can be used for classifications algorithms
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 load(file = "hdma_subset_norm.Rdata")
 
@@ -255,6 +257,10 @@ plot(Psi[,1], Psi[,2], col = as.factor(k8$cluster), xlab = "Dim1", ylab = "Dim2"
      pch=20, main = "Clusters of Individuals")
 
 
+# We can continue from here
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+load(file = "encoded_m.Rdata")
+
 # Split data into 80/20 train/test data and do classification.
 n_total <- round(nrow(encoded_m))
 n_train <- floor(n_total * 0.8)
@@ -277,6 +283,7 @@ library(randomForest)
 gammas <- 2^seq(-3,4)
 svm.models.gammas <- list()
 
+# Following code is used to tune parameters (gammas and costs) of SVC
 # Train for various gammas for RBF kernel SVC, keepig cost = 10 and gammas varying.
 i <- 1
 for(g in gammas) {
