@@ -84,29 +84,6 @@ load(file = "hdma_cleaned.Rdata")
 
 hdma_df <- hdma_df_c
 
-# Let's do PCA of continuous variables and see if there are any variables correlated so we can remove them or substitude with another
-library(FactoMineR)
-library(factoextra)
-pca.hmda <- PCA(hdma_df[,1:9])
-fviz_pca_var(pca.hmda)
-
-# From PCA we observed that applicant_income and loan amount are highly correlated so we can remove them and substitude with another variable
-# However we might also want to leave those two columns and test if results will improve
-
-# Pretty much number of years it would take a payer to pay a loan fully assuming that he pays 20% of his gross anual income on loan
-hdma_df$payable_period <- hdma_df$loan_amount_000s/(0.20*hdma_df$applicant_income_000s)
-
-require(dplyr)
-#swap columns
-hdma_df$loan_amount_000s <- hdma_df$payable_period
-hdma_df <- rename(hdma_df, "payable_period" = "loan_amount_000s")
-
-# remove 2 columns which we used to calculate payable_period
-hdma_df <- subset(hdma_df, select = -c(applicant_income_000s))
-hdma_df <- hdma_df[,-ncol(hdma_df)]
-
-summary(hdma_df)
-
 # Find outliers for loan amount column
 loan_outliers <- boxplot.stats(hdma_df$loan_amount_000s)$out
 # We select rows where loan amount is less than minimal value of loan outliers
@@ -216,8 +193,6 @@ save(hdma_subset, file = "hdma_subset_norm.Rdata")
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 load(file = "hdma_subset_norm.Rdata")
 
-
-
 # The column index of response/class variable
 resp_variable <- which(colnames(hdma_subset) == "action_taken_name")
 
@@ -230,36 +205,11 @@ encoded_m1 <- predict(encoder, hdma_subset[,-resp_variable])
 # We can use encoded_m for future purposes (PCA/Clustering/Training models/etc.)
 encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
 
-# We can skip this PCA and clustering and continue with classification models down
-library(FactoMineR)
-pca <- PCA(encoded_m, quali.sup = ncol(encoded_m), graph = FALSE)
-
-Psi <- pca$ind$coord
-
-library(cluster)
-dist.matr <- dist(Psi, method = "euclidean")
-
-hc.matr <- hclust(dist.matr, method = "ward.D2")
-n <- length(hc.matr$height)
-barplot(hc.matr$height[(n-40):n], ylim = c(0, max(round(hc.matr$height+2))), 
-        main = "Aggregated distance at each iteration")
-
-# From barplot we see that aggregated distance started increasing rapidly at 200, so
-# number of classes we select will be 200. But we know that we have 8 in original one, so let's stick to it.
-nclasses <- length(levels(encoded_m$hdma_subset.action_taken_name))
-ct <- cutree(hc.matr, k = nclasses)
-cdg <- aggregate(as.data.frame(Psi), list(ct), mean)[,-1]
-
-k8 <- kmeans(x = Psi, centers = cdg)
-
-# Plot clusters
-plot(Psi[,1], Psi[,2], col = as.factor(k8$cluster), xlab = "Dim1", ylab = "Dim2",
-     pch=20, main = "Clusters of Individuals")
-
-
 # We can continue from here
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 load(file = "encoded_m.Rdata")
+library(e1071)
+library(rpart)
 
 # Split data into 80/20 train/test data and do classification.
 n_total <- round(nrow(encoded_m))
@@ -289,9 +239,11 @@ i <- 1
 for(g in gammas) {
   svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
                    kernel = "radial", gamma = g, cost = 10)
-  svm.models[[i]] <- svm.model
+  svm.models.gammas[[i]] <- svm.model
   i <- i+1
 }
+
+save(svm.models.gammas, file = "svm_models_gammas.Rdata")
 
 svm.predictions.gammas <- list()
 i <- 1
@@ -302,8 +254,8 @@ for(svm.model in svm.models.gammas) {
 }
 
 i <- 1
-errors.gammas <- vector(length = length(svm.predictions))
-for(i in 1:length(svm.predictions)) {
+errors.gammas <- vector(length = length(svm.predictions.gammas))
+for(i in 1:length(svm.predictions.gammas)) {
   pred.table <- table(pred = svm.predictions.gammas[[i]], true = test_set[,ncol(encoded_m)])
   errors.gammas[i] <- 1 - sum(diag(pred.table))/sum(pred.table)
 }
@@ -319,6 +271,8 @@ for(c in costs) {
   svm.models.costs[[i]] <- svm.model
   i <- i+1
 }
+
+save(svm.models.costs, file = "svm_models_costs.Rdata")
 
 svm.predictions.costs <- list()
 i <- 1
@@ -343,6 +297,6 @@ svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = 
 svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
 svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_m)])
 
-# Best accuracy so ar is 60% :(
+# Best accuracy so ar is 67.2% :)
 sum(diag(svm.pred.table))/sum(svm.pred.table)
 
