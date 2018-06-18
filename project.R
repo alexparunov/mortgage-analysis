@@ -222,11 +222,65 @@ train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
 train_set <- encoded_m[train_indexes,]
 test_set <- encoded_m[-train_indexes,]
 
+# Naive Bayes classifier
+model.nb <- naiveBayes(action_taken_name ~ ., data = hdma_subset[train_indexes,])
+# Compute now the apparent error
+pred <- predict(model.nb, hdma_subset[train_indexes, -which(colnames(hdma_subset) == "action_taken_name")])
+
+# Form and display confusion matrix & overall error
+(ct <- table(Truth=hdma_subset[train_indexes,]$action_taken_name, Preds=pred) )
+
+# Accuracy and error rate
+(sum(diag(ct))/sum(ct))
+1 - sum(diag(ct))/sum(ct)
+
 # Random Forest classifier
 library(randomForest)
 
+# Try with random forest with ntree = 100
+model.rf <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=100, proximity=FALSE)
+#model.rf
+# Variable's importance
+varImpPlot(model.rf)
 
+pred.rf <- predict (model.rf, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
+(ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf))
+(sum(diag(ct))/sum(ct))
 
+## Now we can try to optimize the number of trees, guided by OOB:
+(ntrees <- round(10^seq(1,4,by=0.2)))
+# prepare the structure to store the partial results
+rf.results <- matrix (rep(0,2*length(ntrees)),nrow=length(ntrees))
+colnames (rf.results) <- c("ntrees", "OOB")
+rf.results[,"ntrees"] <- ntrees
+rf.results[,"OOB"] <- 0
+
+ii <- 1
+for (nt in ntrees)
+{ 
+  print(nt)
+  model.rf <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=nt, proximity=FALSE)
+  
+  # get the OOB
+  rf.results[ii,"OOB"] <- model.rf$err.rate[nt,1]
+  # Free memory
+  gc()
+  ii <- ii+1
+}
+
+rf.results
+lowest.OOB.error <- as.integer(which.min(rf.results[,"OOB"]))
+(ntrees.best <- rf.results[lowest.OOB.error,"ntrees"])
+
+model.rf3 <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=ntree.best, proximity=FALSE)
+pred.rf3 <- predict (model.rf3, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
+
+(ct <- table(Truth=hdma_subset[-train_indexes,]$type, Pred=pred.rf3))
+
+# percent by class
+prop.table(ct, 1)
+# total percent correct
+sum(diag(ct))/sum(ct)
 
 
 # SVM
