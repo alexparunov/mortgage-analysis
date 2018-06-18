@@ -237,8 +237,24 @@ pred <- predict(model.nb, hdma_subset[-train_indexes, -which(colnames(hdma_subse
 # Random Forest classifier
 library(randomForest)
 
+set.seed(788)
+model.rf <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=100, proximity=FALSE)
+
+pred.rf <- predict (model.rf, hdma_subset[-train_indexes,], type="class")
+ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf)
+(sum(diag(ct))/sum(ct))
+
+# Stratify the sampling in the boostrap resamples, upsample the less represented class
+set.seed(788)
+model.rf2 <- randomForest(action_taken_name ~ ., data = hdma_subset[train_indexes,], ntree=100, proximity=FALSE, sampsize=c(approved=550, denied=3000, withdrawn=3000, closed=900, originated= 8000, purchased=2200, preapproved=10, predenied=25), strata=hdma_subset[train_indexes,]$action_taken_name)
+
+pred.rf2 <- predict (model.rf2, hdma_subset[-train_indexes,], type="class")
+ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf2)
+(sum(diag(ct))/sum(ct))
+# It seems like that upsample method is not helping
+
 ## Now we can try to optimize the number of trees, guided by OOB:
-(ntrees <- round(10^seq(1,4,by=0.2)))
+(ntrees <- round(10^seq(1,3.7,by=0.2)))
 # prepare the structure to store the partial results
 rf.results <- matrix (rep(0,2*length(ntrees)),nrow=length(ntrees))
 colnames (rf.results) <- c("ntrees", "OOB")
@@ -257,6 +273,9 @@ for (nt in ntrees)
   gc()
   ii <- ii+1
 }
+
+#save(rf.results, file = "rf_result.Rdata")
+load(file = "rf_result.Rdata")
 
 rf.results
 lowest.OOB.error <- as.integer(which.min(rf.results[,"OOB"]))
