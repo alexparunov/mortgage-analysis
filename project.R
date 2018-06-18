@@ -224,11 +224,11 @@ test_set <- encoded_m[-train_indexes,]
 
 # Naive Bayes classifier
 model.nb <- naiveBayes(action_taken_name ~ ., data = hdma_subset[train_indexes,])
-# Compute now the apparent error
-pred <- predict(model.nb, hdma_subset[train_indexes, -which(colnames(hdma_subset) == "action_taken_name")])
+# Compute now the test error
+pred <- predict(model.nb, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")])
 
 # Form and display confusion matrix & overall error
-(ct <- table(Truth=hdma_subset[train_indexes,]$action_taken_name, Preds=pred) )
+(ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Preds=pred) )
 
 # Accuracy and error rate
 (sum(diag(ct))/sum(ct))
@@ -236,16 +236,6 @@ pred <- predict(model.nb, hdma_subset[train_indexes, -which(colnames(hdma_subset
 
 # Random Forest classifier
 library(randomForest)
-
-# Try with random forest with ntree = 100
-model.rf <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=100, proximity=FALSE)
-#model.rf
-# Variable's importance
-varImpPlot(model.rf)
-
-pred.rf <- predict (model.rf, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
-(ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf))
-(sum(diag(ct))/sum(ct))
 
 ## Now we can try to optimize the number of trees, guided by OOB:
 (ntrees <- round(10^seq(1,4,by=0.2)))
@@ -276,6 +266,9 @@ model.rf3 <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,]
 pred.rf3 <- predict (model.rf3, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
 
 (ct <- table(Truth=hdma_subset[-train_indexes,]$type, Pred=pred.rf3))
+#model.rf
+# Variable's importance
+varImpPlot(pred.rf3)
 
 # percent by class
 prop.table(ct, 1)

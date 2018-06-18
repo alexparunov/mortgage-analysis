@@ -13,3 +13,6 @@ Step 5: Perform onehot encoding on data frame (lines 197-206)
 All above given steps can be skipped if we load already encoded data frame from encoded_m.Rdata file (line 210)
 
 Step 6: Split subsetted data set into training and test (80/20 ratio) (lines 211-223)
+Step 7: Run Naive Bayes classifier to find out the test error (lines 226-235)
+Step 8: Run Random Forest classifier (lines 238-276)
+Step 9: Run SVM classifier to select parameters cost and gamma and select the best one based on test errors (lines 287-355)
