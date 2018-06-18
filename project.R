@@ -133,32 +133,36 @@ load(file = "hdma_processed.Rdata")
 # 8) Preapproval request denied by financial institution
 levels(hdma_df$action_taken_name) <- c("approved","denied","withdrawn","closed","originated","purchased","preapproved","predenied")
 
-# Let's construct dataset which has almost equal amount of all classes, but reduced size
+# Let's construct dataset which has almost same proportion as the original data, but with reduced size (30000)
+# This show us the proportion of each class of response variable
+table(hdma_df$action_taken_name)/nrow(hdma_df)*100
+
 hdma_subset <- hdma_df[hdma_df$action_taken_name == "predenied",]
 hdma_subset <- rbind(hdma_df[hdma_df$action_taken_name == "preapproved",], hdma_subset)
 
-# Take 10% of each subsets
-prop <- 0.10
+
 approved_subset <- hdma_df[hdma_df$action_taken_name == "approved",]
-approved_subset <- approved_subset[sample(nrow(approved_subset), size = prop*nrow(approved_subset)),]
+set.seed(953)
+approved_subset <- approved_subset[sample(nrow(approved_subset), floor(0.025*30000)),]
 hdma_subset <- rbind(approved_subset, hdma_subset)
 
 closed_subset <- hdma_df[hdma_df$action_taken_name == "closed",]
-# Take 10% of this dataset
-closed_subset <- closed_subset[sample(nrow(closed_subset), floor(prop*nrow(closed_subset))),]
+set.seed(953)
+closed_subset <- closed_subset[sample(nrow(closed_subset), floor(0.039*30000)),]
 hdma_subset <- rbind(closed_subset, hdma_subset)
 
 # Gettin random 10k individuals from each classes given below
-set.seed(953)
 denied_subset <- hdma_df[hdma_df$action_taken_name == "denied",]
-
-denied_subset <- denied_subset[sample(nrow(denied_subset),floor(prop*nrow(denied_subset))),]
+set.seed(953)
+denied_subset <- denied_subset[sample(nrow(denied_subset), floor(0.14*30000)),]
 
 withdrawn_subset <- hdma_df[hdma_df$action_taken_name == "withdrawn",]
-withdrawn_subset <- withdrawn_subset[sample(nrow(withdrawn_subset),floor(prop*nrow(withdrawn_subset))),]
+set.seed(953)
+withdrawn_subset <- withdrawn_subset[sample(nrow(withdrawn_subset), floor(0.13*30000)),]
 
 purchased_subset <- hdma_df[hdma_df$action_taken_name == "purchased",]
-purchased_subset <- purchased_subset[sample(nrow(purchased_subset), floor(prop*nrow(purchased_subset))),]
+set.seed(953)
+purchased_subset <- purchased_subset[sample(nrow(purchased_subset), floor(0.1*30000)),]
 
 hdma_subset <- rbind(denied_subset, hdma_subset)
 hdma_subset <- rbind(withdrawn_subset, hdma_subset)
