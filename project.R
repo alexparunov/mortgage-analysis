@@ -284,7 +284,7 @@ lowest.OOB.error <- as.integer(which.min(rf.results[,"OOB"]))
 model.rf3 <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=ntree.best, proximity=FALSE)
 pred.rf3 <- predict (model.rf3, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
 
-(ct <- table(Truth=hdma_subset[-train_indexes,]$type, Pred=pred.rf3))
+(ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf3))
 #model.rf
 # Variable's importance
 varImpPlot(pred.rf3)
@@ -369,45 +369,111 @@ sum(diag(svm.pred.table))/sum(svm.pred.table)
 
 # Cross-validation part
 library(TunePareto)
+library(randomForest)
+library(e1071)
 
-# Let's create a cv function that can be extended in furure
-
-model.CV <- function (k, method)
-{
-  CV.folds <- generateCVRuns(data$target, ntimes=1, nfold=k, stratified=TRUE)
+# Function which does average CROSS-VALIDATION and returns results of CROSS-VALIDATION
+model.CV <- function (k, method) {
+  if(method == "SVM") {
+    CV.folds <- generateCVRuns(encoded_m$hdma_subset.action_taken_name, ntimes = 1, nfold = k, 
+                               stratified = TRUE)
+    train_data <- encoded_m[train_indexes,]
+  } else {
+    CV.folds <- generateCVRuns(hdma_subset$action_taken_name, ntimes=1, nfold=k, stratified=TRUE)
+    train_data <- hdma_subset[train_indexes,]
+  }
   
   cv.results <- matrix (rep(0,4*k),nrow=k)
   colnames (cv.results) <- c("k","fold","TR error","VA error")
   
+  all.cv.results <- list()
   cv.results[,"TR error"] <- 0
   cv.results[,"VA error"] <- 0
   cv.results[,"k"] <- k
   
-  for (j in 1:k)
-  {
+  for (j in 1:k) {
     # get VA data
     va <- unlist(CV.folds[[1]][[j]])
     
     # train on TR data
-    if (method == "SVM") { my.da.TR <- lda(target ~ X1 + X2, data = data[-va,], prior=priors, CV=FALSE) }
-    else if (method == "RandomForest") { my.model.TR <- randomForest(action_taken_name~ ., data=data[-va,], ntree=1000, proximity=FALSE) 
-    else if (method == "NaiveBayes") { my.model.TR <-  naiveBayes(action_taken_name ~ ., data = data[-va,]) }
+    if (method == "SVM") {
+      my.model.TR <- svm(hdma_subset.action_taken_name ~ ., data = train_data[-va,], 
+                      scale = FALSE, kernel = "radial", gamma = 0.05, cost = 10, CV=FALSE) 
+    }
+    else if (method == "RandomForest") {
+      my.model.TR <- randomForest(action_taken_name ~ ., data=train_data[-va,], ntree=1000, proximity=FALSE) 
+    }
+    else if (method == "NaiveBayes") { 
+      my.model.TR <-  naiveBayes(action_taken_name ~ ., data = train_data[-va,]) 
+    }
     else stop("Wrong method")
     
     # predict TR data
-    pred.va <- predict (my.model.TR, data[-va, -which(colnames(data) == "action_taken_name")], type="class")
+    if(method == "SVM") {
+      pred.va <- predict(my.model.TR, train_data[-va, -which(colnames(train_data) == "hdma_subset.action_taken_name")], type="class")
+      tab <- table(Truth = train_data[-va,]$hdma_subset.action_taken_name, Pred = pred.va)
+    } else {
+      pred.va <- predict(my.model.TR, train_data[-va, -which(colnames(train_data) == "action_taken_name")], type="class")
+      tab <- table(train_data[-va,]$action_taken_name, pred.va)
+    }
     
-    tab <- table(data[-va,]$target, pred.va)
     cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
     
     # predict VA data
-    pred.va <- predict (my.da.TR, data[-va, -which(colnames(data) == "action_taken_name")], type="class")
+    if(method == "SVM") {
+      pred.va <- predict (my.model.TR, train_data[va, -which(colnames(train_data) == "hdma_subset.action_taken_name")], type="class")
+      tab <- table(Truth = train_data[va,]$hdma_subset.action_taken_name, Pred = pred.va)
+    } else {
+      pred.va <- predict (my.model.TR, train_data[va, -which(colnames(train_data) == "action_taken_name")], type="class")
+      tab <- table(Truth = train_data[va,]$action_taken_name, Pred = pred.va)
+    }
     
-    tab <- table(data[va,]$target, pred.va)
     cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
     
     cv.results[j,"fold"] <- j
+    all.cv.results[[j]] <- cv.results
   }
-  mean(cv.results[,"VA error"])
+    
+  return(all.cv.results)
+  
 }
 
+
+# 10 fold CROSS-VALIDATION for NaiveBayes
+k <- 10
+nb.cv <- model.CV(k, method = "NaiveBayes")
+
+# plot result for mean VA error for each fold [1-10]
+nb.mean.cv <- vector(mode = "numeric",length = k)
+for(j in 1:k){
+  nb.mean.cv[j] <- mean(nb.cv[[j]][,"VA error"])
+}
+plot(nb.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
+axis(1, at=1:20,labels=1:20, las=2)
+grid()
+
+# 10 fold CROSS-VALIDATION for Random Forest
+k <- 10
+rb.cv <- model.CV(k, method = "RandomForest")
+
+# plot result for mean VA error for each fold [1-10]
+rf.mean.cv <- vector(mode = "numeric",length = k)
+for(j in 1:k){
+  rb.mean.cv[j] <- mean(rb.cv[[j]][,"VA error"])
+}
+plot(rb.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
+axis(1, at=1:20,labels=1:20, las=2)
+grid()
+
+
+# 10 fold CROSS-VALIDATION for SVM
+k <- 10
+svm.cv <- model.CV(k, method = "SVM")
+# plot result for mean VA error for each fold [1-10]
+svm.mean.cv <- vector(mode = "numeric",length = k)
+for(j in 1:k){
+  svm.mean.cv[j] <- mean(rb.cv[[j]][,"VA error"])
+}
+plot(svm.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
+axis(1, at=1:20,labels=1:20, las=2)
+grid()
