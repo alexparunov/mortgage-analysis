@@ -366,3 +366,48 @@ svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_
 # Best accuracy so ar is 67.2% :)
 sum(diag(svm.pred.table))/sum(svm.pred.table)
 
+
+# Cross-validation part
+library(TunePareto)
+
+# Let's create a cv function that can be extended in furure
+
+model.CV <- function (k, method)
+{
+  CV.folds <- generateCVRuns(data$target, ntimes=1, nfold=k, stratified=TRUE)
+  
+  cv.results <- matrix (rep(0,4*k),nrow=k)
+  colnames (cv.results) <- c("k","fold","TR error","VA error")
+  
+  cv.results[,"TR error"] <- 0
+  cv.results[,"VA error"] <- 0
+  cv.results[,"k"] <- k
+  
+  for (j in 1:k)
+  {
+    # get VA data
+    va <- unlist(CV.folds[[1]][[j]])
+    
+    # train on TR data
+    if (method == "SVM") { my.da.TR <- lda(target ~ X1 + X2, data = data[-va,], prior=priors, CV=FALSE) }
+    else if (method == "RandomForest") { my.model.TR <- randomForest(action_taken_name~ ., data=data[-va,], ntree=1000, proximity=FALSE) 
+    else if (method == "NaiveBayes") { my.model.TR <-  naiveBayes(action_taken_name ~ ., data = data[-va,]) }
+    else stop("Wrong method")
+    
+    # predict TR data
+    pred.va <- predict (my.model.TR, data[-va, -which(colnames(data) == "action_taken_name")], type="class")
+    
+    tab <- table(data[-va,]$target, pred.va)
+    cv.results[j,"TR error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+    
+    # predict VA data
+    pred.va <- predict (my.da.TR, data[-va, -which(colnames(data) == "action_taken_name")], type="class")
+    
+    tab <- table(data[va,]$target, pred.va)
+    cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
+    
+    cv.results[j,"fold"] <- j
+  }
+  mean(cv.results[,"VA error"])
+}
+
