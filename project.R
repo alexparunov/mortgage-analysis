@@ -389,7 +389,6 @@ model.CV <- function (k, method) {
   all.cv.results <- list()
   cv.results[,"TR error"] <- 0
   cv.results[,"VA error"] <- 0
-  cv.results[,"k"] <- k
   
   for (j in 1:k) {
     # get VA data
@@ -430,7 +429,6 @@ model.CV <- function (k, method) {
     
     cv.results[j,"VA error"] <- 1-sum(tab[row(tab)==col(tab)])/sum(tab)
     
-    cv.results[j,"fold"] <- j
     all.cv.results[[j]] <- cv.results
   }
     
@@ -478,3 +476,42 @@ for(j in 1:k){
 plot(svm.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
+
+# Load datasets to train final models
+setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
+load(file = "hdma_subset_norm.Rdata.Rdata")
+load(file = "encoded_m.Rdata")
+library(e1071)
+library(rpart)
+
+# Split data into 80/20 train/test data and do classification.
+n_total <- round(nrow(encoded_m))
+n_train <- floor(n_total * 0.8)
+n_test <- n_total - n_train
+
+set.seed(739)
+train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
+
+train_set <- encoded_m[train_indexes,]
+test_set <- encoded_m[-train_indexes,]
+
+# Random Forest Classifier
+set.seed(788)
+model.rf <- randomForest(action_taken_name ~ ., data = hdma_subset[train_indexes,], ntree=400, proximity=FALSE)
+
+pred.rf <- predict (model.rf, hdma_subset[-train_indexes,], type="class")
+ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf)
+
+# Best accuracy is 66%
+(sum(diag(ct))/sum(ct))
+
+# SV Classifier
+
+svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
+                   kernel = "radial", gamma = 0.05, cost = 10)
+svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
+svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_m)])
+
+# Best accuracy is 
+(sum(diag(svm.pred.table))/sum(svm.pred.table))
+

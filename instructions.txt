@@ -2,7 +2,7 @@ The following text contains instructions how to reproduce same results as we hav
 
 The code can be run from first lines in order to remove unnecessary columns, rename factors of several categorical variables, 
 and mark some values as missing data. Those are lines 1-71 of "project.R" script file. However, this dataset contains many NAs and
-in order to perform imputation we used Google Virtual Machine and run it in the cloud for around 17 hours. After imputation was performed we saved it as R object into the file hdma_cleaned.Rdata. So the whole work can be continued from here.
+in order to perform imputation we used Google Virtual Machine and run it in the cloud for around 17 hours. After imputation was performed we saved it as R object into the file hdma_cleaned.Rdata. So the whole work can be continued from here. Keep in mind that line numbers ar approximate, since it is impossible to specify exact line numbers due to the fact that code is dynamic.
 
 Step 1: load hdma_cleaned.Rdata (line 83)
 Step 2: Remove outliers for 2 numerical columns (lines 85-97)
@@ -16,3 +16,5 @@ Step 6: Split subsetted data set into training and test (80/20 ratio) (lines 211
 Step 7: Run Naive Bayes classifier to find out the test error (lines 226-235)
 Step 8: Run Random Forest classifier (lines 238-276)
 Step 9: Run SVM classifier to select parameters cost and gamma and select the best one based on test errors (lines 287-355)
+Step 10: Run cross validation (lines 370-486)
+Step 11: Train final chosen models and obtain accuracy (lines 480-518)
