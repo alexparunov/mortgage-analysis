@@ -375,11 +375,11 @@ library(e1071)
 # Function which does average CROSS-VALIDATION and returns results of CROSS-VALIDATION
 model.CV <- function (k, method) {
   if(method == "SVM") {
-    CV.folds <- generateCVRuns(encoded_m$hdma_subset.action_taken_name, ntimes = 1, nfold = k, 
+    CV.folds <- generateCVRuns(encoded_m[train_indexes,]$hdma_subset.action_taken_name, ntimes = 1, nfold = k, 
                                stratified = TRUE)
     train_data <- encoded_m[train_indexes,]
   } else {
-    CV.folds <- generateCVRuns(hdma_subset$action_taken_name, ntimes=1, nfold=k, stratified=TRUE)
+    CV.folds <- generateCVRuns(hdma_subset[train_indexes,]$action_taken_name, ntimes=1, nfold=k, stratified=TRUE)
     train_data <- hdma_subset[train_indexes,]
   }
   
@@ -391,16 +391,17 @@ model.CV <- function (k, method) {
   cv.results[,"VA error"] <- 0
   
   for (j in 1:k) {
+    print(j)
     # get VA data
     va <- unlist(CV.folds[[1]][[j]])
-    
+    #print(length(va))
     # train on TR data
     if (method == "SVM") {
       my.model.TR <- svm(hdma_subset.action_taken_name ~ ., data = train_data[-va,], 
                       scale = FALSE, kernel = "radial", gamma = 0.05, cost = 10, CV=FALSE) 
     }
     else if (method == "RandomForest") {
-      my.model.TR <- randomForest(action_taken_name ~ ., data=train_data[-va,], ntree=100, proximity=FALSE) 
+      my.model.TR <- randomForest(action_taken_name ~ ., data=train_data[-va,], ntree=398, proximity=FALSE) 
     }
     else if (method == "NaiveBayes") { 
       my.model.TR <-  naiveBayes(action_taken_name ~ ., data = train_data[-va,]) 
@@ -408,10 +409,17 @@ model.CV <- function (k, method) {
     else stop("Wrong method")
     
     # predict TR data
-    if(method == "SVM") {
+    if (method == "SVM") {
       pred.va <- predict(my.model.TR, train_data[-va, -which(colnames(train_data) == "hdma_subset.action_taken_name")], type="class")
       tab <- table(Truth = train_data[-va,]$hdma_subset.action_taken_name, Pred = pred.va)
-    } else {
+    } 
+    else if (method == "RandomForest") {
+      pred.va <- my.model.TR$predicted
+      #print(length(pred.va))
+      #print(length(train_data[-va,]$action_taken_name))
+      tab <- table(Truth = train_data[-va,]$action_taken_name, Pred = pred.va)
+    }
+    else {
       pred.va <- predict(my.model.TR, train_data[-va, -which(colnames(train_data) == "action_taken_name")], type="class")
       tab <- table(train_data[-va,]$action_taken_name, pred.va)
     }
@@ -420,8 +428,9 @@ model.CV <- function (k, method) {
     
     # predict VA data
     if(method == "SVM") {
+      td <- train_data[va,]$hdma_subset.action_taken_name
       pred.va <- predict (my.model.TR, train_data[va, -which(colnames(train_data) == "hdma_subset.action_taken_name")], type="class")
-      tab <- table(Truth = na.omit(train_data[va,]$hdma_subset.action_taken_name), Pred = pred.va)
+      tab <- table(Truth = train_data[va,]$hdma_subset.action_taken_name, Pred = pred.va)
     } else {
       pred.va <- predict (my.model.TR, train_data[va, -which(colnames(train_data) == "action_taken_name")], type="class")
       tab <- table(Truth = train_data[va,]$action_taken_name, Pred = pred.va)
@@ -440,7 +449,7 @@ model.CV <- function (k, method) {
 # 10 fold CROSS-VALIDATION for NaiveBayes
 k <- 10
 nb.cv <- model.CV(k, method = "NaiveBayes")
-
+nb.cv.df <- as.data.frame(nb.cv[10]) 
 # plot result for mean VA error for each fold [1-10]
 nb.mean.cv <- vector(mode = "numeric",length = k)
 for(j in 1:k){
@@ -452,14 +461,14 @@ grid()
 
 # 10 fold CROSS-VALIDATION for Random Forest
 k <- 10
-rb.cv <- model.CV(k, method = "RandomForest")
-
+rf.cv <- model.CV(k, method = "RandomForest")
+rf.cv.df <- as.data.frame(rf.cv[10])
 # plot result for mean VA error for each fold [1-10]
 rf.mean.cv <- vector(mode = "numeric",length = k)
 for(j in 1:k){
-  rb.mean.cv[j] <- mean(rb.cv[[j]][,"VA error"])
+  rf.mean.cv[j] <- mean(rf.cv[[j]][,"VA error"])
 }
-plot(rb.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
+plot(rf.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
 
