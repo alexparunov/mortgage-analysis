@@ -401,7 +401,7 @@ model.CV <- function (k, method) {
                       scale = FALSE, kernel = "radial", gamma = 0.05, cost = 10, CV=FALSE) 
     }
     else if (method == "RandomForest") {
-      my.model.TR <- randomForest(action_taken_name ~ ., data=train_data[-va,], ntree=1000, proximity=FALSE) 
+      my.model.TR <- randomForest(action_taken_name ~ ., data=train_data[-va,], ntree=100, proximity=FALSE) 
     }
     else if (method == "NaiveBayes") { 
       my.model.TR <-  naiveBayes(action_taken_name ~ ., data = train_data[-va,]) 
@@ -422,7 +422,7 @@ model.CV <- function (k, method) {
     # predict VA data
     if(method == "SVM") {
       pred.va <- predict (my.model.TR, train_data[va, -which(colnames(train_data) == "hdma_subset.action_taken_name")], type="class")
-      tab <- table(Truth = train_data[va,]$hdma_subset.action_taken_name, Pred = pred.va)
+      tab <- table(Truth = na.omit(train_data[va,]$hdma_subset.action_taken_name), Pred = pred.va)
     } else {
       pred.va <- predict (my.model.TR, train_data[va, -which(colnames(train_data) == "action_taken_name")], type="class")
       tab <- table(Truth = train_data[va,]$action_taken_name, Pred = pred.va)
@@ -469,6 +469,7 @@ grid()
 # 10 fold CROSS-VALIDATION for SVM
 k <- 10
 svm.cv <- model.CV(k, method = "SVM")
+
 # plot result for mean VA error for each fold [1-10]
 svm.mean.cv <- vector(mode = "numeric",length = k)
 for(j in 1:k){
