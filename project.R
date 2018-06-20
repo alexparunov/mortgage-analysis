@@ -21,6 +21,8 @@ remove_columns <- function(hdma_df, column_names) {
   return(hdma_df)
 }
 
+#------ Preprocessing part ------
+
 # Columns to remove: 
 # We don't need state abbreviation, it's always Washington (WA)
 # We don't care about ids and sequence number and year (2016)
@@ -69,13 +71,6 @@ hdma_df$owner_occupancy_name[is.na(hdma_df$owner_occupancy_name)] <- NA
 
 # Save pre-processed data frame for future uses, so we can skip above given lines
 save(hdma_df, file = "hdma_processed.Rdata")
-
-if(!require(rstudioapi)) {
-  install.packages("rstudioapi")
-  require(rstudioapi)
-}
-
-setwd(dirname(getActiveDocumentContext()$path))
 
 # Load data frame which contains no NA's. The imputation was done on Google Virtual Machine since it took around 17hours
 # The below given dataframe is ready to be worked on.
@@ -186,7 +181,16 @@ for(i in 1:8) {
 # Restore plot style
 par(mfrow=c(1,1))
 
-save(hdma_subset, file = "hdma_subset_norm.Rdata")
+
+# ------ Detecting possible outliers ------
+library(chemometrics)
+subset_outliers <- Moutlier(hdma_subset[, 1:8],quantile = 0.975, plot = TRUE)
+max(subset_outliers$rd)
+min(subset_outliers$rd)
+# From the robust mahalanobis distances we haven't detected more outliers after in the subset data
+
+
+#save(hdma_subset, file = "hdma_subset_norm.Rdata")
 
 # This data frame "hdma_subset" can be used for classifications algorithms
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -220,6 +224,76 @@ train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
 
 train_set <- encoded_m[train_indexes,]
 test_set <- encoded_m[-train_indexes,]
+
+
+# ------ PCA + HC + KMEANS ------
+# Free memory
+gc()
+load(file = "encoded_m.Rdata")
+pca = PCA(encoded_m, quali.sup = c(which(colnames(encoded_m) == "hdma_subset.action_taken_name")), ncp=ncol(encoded_m))
+#pca = PCA(wine_quality, quali.sup = c(12), ncp=12)
+pca$eig
+plot(pca$eig[,1])
+lines(pca$eig[,1])
+# Sum up to 80% of total inertia
+nd = 34
+Psi <- pca$ind$coord[,c(1:nd)]
+d <- dist(Psi, method = "euclidean")
+hc <- hclust(d, method = "ward.D2")
+
+# Determining the greatest height jump and number of clusters
+height.diff <- c(hc$height,0) - c(0,hc$height)
+before.maxi <- which.max(height.diff[c(1:(length(height.diff)-2))]) - 1
+nc = length(hc$height) - before.maxi + 1
+height.line <- (hc$height[before.maxi + 1] + hc$height[before.maxi ])/2
+
+# Print the cluster dendrogram and last 100 jumps
+par(mfrow = c(1, 1))
+plot(hc)
+abline(a=height.line,b=0,col="red",)
+barplot(hc$height[(length(hc$height) - 100):length(hc$height)], xlab = "Height histogram")
+abline(a=height.line,b=0,col="red",)
+
+c3 <- cutree(hc,nc)
+gc()
+# computation of the centroids of clusters
+cdg <- aggregate(Psi,list(c3),mean)[,2:(nd+1)]
+Bss <- sum(rowSums(cdg^2)*as.numeric(table(c3)))
+Tss <- sum(rowSums(Psi^2))
+(optimization.criterion.before <- 100*Bss/Tss)
+
+iden <- rownames(Psi)
+par(mfrow=c(1,1))
+plot(Psi[,1],Psi[,2],type="p",main="Clustering with HC", col=c3, xlab = "Dim. 1", ylab = "Dim. 2")
+#text(Psi[,1],Psi[,2],col=c3,labels=iden,cex = 0.6)
+abline(h=0,v=0,col="gray")
+legend("topleft",c("c1","c2","c3","c4","c5","c6","c7"),pch=20,col=c(1:7))
+points(cdg, pc=21, col = "gold", bg="gold", cex = 1.5)
+text(cdg - rep(0.3,length(cdg)),labels=c("G1","G2","G3","G4","G5","G6","G7"),col="red3", cex=1.2)
+
+library(fpc)
+# K-means computation
+k_def <- kmeans(Psi,centers=cdg, iter.max = 10)
+Bss <- sum(rowSums(k_def$centers^2)*as.numeric(table(k_def$cluster)))
+Wss <- sum(k_def$withinss)
+(optimization.criterion.kmean <- 100*(Bss/(Bss+Wss)))
+
+# printing final clusters
+par(mfrow=c(1,1))
+plot(Psi,type="p",col=k_def$cluster+15, main="K-means Clustering")
+#text(Psi,labels=iden,col=k_def$cluster)
+abline(h=0,v=0,col="gray")
+legend("bottomright",c("C1","C2","C3","C4","C5", "C6", "C7"),pch=20,col=c(16:22))
+points(k_def$centers, pc=21, col = "gold", bg="gold", cex = 1.5)
+text(k_def$centers - rep(0.45,length(k_def$centers)),labels=c("G1","G2","G3","G4","G5","G6","G7"),col="red3", cex=1.2)
+
+# Quality of the Kmeans clustering
+Bss = k_def$betweenss
+Wss = k_def$tot.withinss
+(optimization.criterion.after <- 100*Bss/(Bss+Wss))
+
+
+# ------ Classification models part ------
 
 # Naive Bayes classifier
 model.nb <- naiveBayes(action_taken_name ~ ., data = hdma_subset[train_indexes,])
@@ -273,17 +347,18 @@ for (nt in ntrees)
   gc()
   ii <- ii+1
 }
+#save(rf.results, file = "rf_result.Rdata")
+load(file = "rf_result.Rdata")
 
 rf.results
-lowest.OOB.error <- as.integer(which.min(rf.results[,"OOB"]))
-(ntrees.best <- rf.results[lowest.OOB.error,"ntrees"])
+(ntrees.best <- 398)
 
 model.rf3 <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=ntree.best, proximity=FALSE)
 pred.rf3 <- predict (model.rf3, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
 
 (ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf3))
 #model.rf
-# Variable's importance
+# Variable's importance, if we eliminate the least important variablem, the error rate increases.
 varImpPlot(pred.rf3)
 
 # percent by class
@@ -306,7 +381,7 @@ for(g in gammas) {
   i <- i+1
 }
 
-save(svm.models.gammas, file = "svm_models_gammas.Rdata")
+#save(svm.models.gammas, file = "svm_models_gammas.Rdata")
 
 svm.predictions.gammas <- list()
 i <- 1
@@ -485,7 +560,7 @@ sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 # 10 fold CROSS-VALIDATION for SVM
 k <- 10
 svm.cv <- model.CV(k, method = "SVM")
-
+svm.cv.df <- as.data.frame(svm.cv[10])
 # plot result for mean VA error for each fold [1-10]
 svm.mean.cv <- vector(mode = "numeric",length = k)
 for(j in 1:k){
@@ -540,7 +615,6 @@ svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_
 (sum(diag(svm.pred.table))/sum(svm.pred.table))
 
 
-
 # Train the big data set using Random Forest algorithm
 load(file = "hdma_processed.Rdata")
 t_hdma <- hdma_df
@@ -564,7 +638,7 @@ train_set <- t_hdma[train_indexes, ]
 test_set <- t_hdma[-train_indexes, ]
 
 library(randomForest)
-model.big.rf <- randomForest(action_taken_name ~ ., data = train_set, ntree = 400, proximit = FALSE)
+model.big.rf <- randomForest(action_taken_name ~ ., data = train_set, ntree = 398, proximit = FALSE)
 
 pred.big.rf <- predict (model.big.rf, test_set, type="class")
 ct <- table(Truth=test_set$action_taken_name, Pred=pred.big.rf)
