@@ -129,7 +129,6 @@ set.seed(953)
 closed_subset <- closed_subset[sample(nrow(closed_subset), floor(t_n[4]*30000)),]
 hdma_subset <- rbind(closed_subset, hdma_subset)
 
-# Gettin random 10k individuals from each classes given below
 denied_subset <- hdma_df[hdma_df$action_taken_name == "denied",]
 set.seed(953)
 denied_subset <- denied_subset[sample(nrow(denied_subset), floor(t_n[2]*30000)),]
@@ -189,7 +188,7 @@ par(mfrow=c(1,1))
 
 #save(hdma_subset, file = "hdma_subset_norm.Rdata")
 
-# This data frame can be used for classifications algorithms
+# This data frame "hdma_subset" can be used for classifications algorithms
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 load(file = "hdma_subset_norm.Rdata")
 
@@ -246,7 +245,8 @@ ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf)
 
 # Stratify the sampling in the boostrap resamples, upsample the less represented class
 set.seed(788)
-model.rf2 <- randomForest(action_taken_name ~ ., data = hdma_subset[train_indexes,], ntree=100, proximity=FALSE, sampsize=c(approved=550, denied=3000, withdrawn=3000, closed=900, originated= 8000, purchased=2200, preapproved=10, predenied=25), strata=hdma_subset[train_indexes,]$action_taken_name)
+model.rf2 <- randomForest(action_taken_name ~ ., data = hdma_subset[train_indexes,], ntree=100, 
+                          proximity=FALSE, sampsize=c(approved=550, denied=3000, withdrawn=3000, closed=900, originated= 8000, purchased=2200, preapproved=10, predenied=25), strata=hdma_subset[train_indexes,]$action_taken_name)
 
 pred.rf2 <- predict (model.rf2, hdma_subset[-train_indexes,], type="class")
 ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf2)
@@ -274,9 +274,6 @@ for (nt in ntrees)
   ii <- ii+1
 }
 
-#save(rf.results, file = "rf_result.Rdata")
-load(file = "rf_result.Rdata")
-
 rf.results
 lowest.OOB.error <- as.integer(which.min(rf.results[,"OOB"]))
 (ntrees.best <- rf.results[lowest.OOB.error,"ntrees"])
@@ -295,7 +292,7 @@ prop.table(ct, 1)
 sum(diag(ct))/sum(ct)
 
 
-# SVM
+# Support Vector Classifier
 gammas <- 2^seq(-3,4)
 svm.models.gammas <- list()
 
@@ -486,7 +483,7 @@ plot(svm.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
 
-# Load datasets to train final models
+# Load datasets to train/test final models
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 load(file = "hdma_subset_norm.Rdata.Rdata")
 load(file = "encoded_m.Rdata")
@@ -521,6 +518,38 @@ svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = 
 svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
 svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_m)])
 
-# Best accuracy is 
+# Best accuracy is 67%
 (sum(diag(svm.pred.table))/sum(svm.pred.table))
 
+
+
+# Train the big data set using Random Forest algorithm
+load(file = "hdma_processed.Rdata")
+t_hdma <- hdma_df
+t_hdma <- subset(t_hdma, select=-c(county_name, rate_spread, co_applicant_sex_name, co_applicant_race_name_1, co_applicant_ethnicity_name))
+
+loan_range <- seq(from = 0, to = max(t_hdma$loan_amount_000s)+50-max(t_hdma$loan_amount_000s)%%50, by = 50)
+t_hdma$loan_amount_range <- cut(t_hdma$loan_amount_000s, loan_range)
+
+income_range <- seq(from = 0, to = max(t_hdma$applicant_income_000s)+50-max(t_hdma$applicant_income_000s)%%50, by = 50)
+t_hdma$income_range <- cut(t_hdma$applicant_income_000s, income_range)
+
+# Split data into 80/20 train/test data and do classification.
+n_total <- round(nrow(t_hdma))
+n_train <- floor(n_total * 0.8)
+n_test <- n_total - n_train
+
+set.seed(739)
+train_indexes <- sample(seq(from = 1, to = n_total), size = n_train)
+
+train_set <- t_hdma[train_indexes, ]
+test_set <- t_hdma[-train_indexes, ]
+
+library(randomForest)
+model.big.rf <- randomForest(action_taken_name ~ ., data = train_set, ntree = 400, proximit = FALSE)
+
+pred.big.rf <- predict (model.big.rf, test_set, type="class")
+ct <- table(Truth=test_set$action_taken_name, Pred=pred.big.rf)
+
+# Best accuracy is 68% !!!
+(sum(diag(ct))/sum(ct))
