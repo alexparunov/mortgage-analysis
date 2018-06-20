@@ -1,4 +1,5 @@
 The following text contains instructions how to reproduce same results as we have obtained and described in report.
+The folder contains zipped file of original dataset, and it's necessary to unzip it, since it will extract .csv file.
 
 The code can be run from first lines in order to remove unnecessary columns, rename factors of several categorical variables, 
 and mark some values as missing data. Those are lines 1-71 of "project.R" script file. However, this dataset contains many NAs and

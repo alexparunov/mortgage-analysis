@@ -456,6 +456,12 @@ plot(nb.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
 
+# 95% CI for CV error
+pe.hat <- 0.37
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
+
 # 10 fold CROSS-VALIDATION for Random Forest
 k <- 10
 rf.cv <- model.CV(k, method = "RandomForest")
@@ -468,6 +474,12 @@ for(j in 1:k){
 plot(rf.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
+
+# 95% CI for CV error
+pe.hat <- 0.33
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
 
 # 10 fold CROSS-VALIDATION for SVM
@@ -482,6 +494,12 @@ for(j in 1:k){
 plot(svm.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
+
+# 95% CI for CV error
+pe.hat <- 0.32
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
 # Load datasets to train/test final models
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
