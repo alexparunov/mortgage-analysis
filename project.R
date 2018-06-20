@@ -10,7 +10,7 @@ if(!require(rstudioapi)) {
 setwd(dirname(getActiveDocumentContext()$path))
 
 # Read data frame
-hdma_df <- read.csv("Washington_State_HDMA-2016.csv")
+hdma_df <- read.csv("data/Washington_State_HDMA-2016.csv")
 dim(hdma_df)
 summary(hdma_df)
 
@@ -71,12 +71,12 @@ hdma_df$applicant_income_000s[hdma_df$applicant_income_000s == 9999] <- NA
 hdma_df$owner_occupancy_name[is.na(hdma_df$owner_occupancy_name)] <- NA
 
 # Save pre-processed data frame for future uses, so we can skip above given lines
-save(hdma_df, file = "hdma_processed.Rdata")
+save(hdma_df, file = "data/hdma_processed.Rdata")
 
 # Load data frame which contains no NA's. The imputation was done on Google Virtual Machine since it took around 17hours
 # The below given dataframe is ready to be worked on.
 
-load(file = "hdma_cleaned.Rdata")
+load(file = "data/hdma_cleaned.Rdata")
 
 hdma_df <- hdma_df_c
 
@@ -90,10 +90,10 @@ income_outliers <- boxplot.stats(hdma_df$applicant_income_000s)$out
 hdma_df <- hdma_df[hdma_df$applicant_income_000s < min(income_outliers),]
 
 # save file for future usage
-save(hdma_df, file = "hdma_processed.Rdata")
+save(hdma_df, file = "data/hdma_processed.Rdata")
 
 # Load file to continue work
-load(file = "hdma_processed.Rdata")
+load(file = "data/hdma_processed.Rdata")
 
 # Transform levels of active varible for easy interpretation. Initial classes are following:
 # 1) Application approved but not accepted
@@ -148,7 +148,7 @@ originated_subset <- originated_subset[sample(nrow(originated_subset), 30000-nro
 hdma_subset <- rbind(originated_subset, hdma_subset)
 
 # Save subset
-save(hdma_subset, file = "hdma_subset.Rdata")
+save(hdma_subset, file = "data/hdma_subset.Rdata")
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -156,7 +156,7 @@ library(e1071)
 library(rpart)
 
 # Load subset for training/testing
-load("hdma_subset.Rdata")
+load("data/hdma_subset.Rdata")
 hdma_subset <- subset(hdma_subset, select=-c(county_name, rate_spread, co_applicant_sex_name,
                                              co_applicant_race_name_1, co_applicant_ethnicity_name))
 
@@ -195,7 +195,7 @@ min(subset_outliers$rd)
 
 # This data frame "hdma_subset" can be used for classifications algorithms
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-load(file = "hdma_subset_norm.Rdata")
+load(file = "data/hdma_subset_norm.Rdata")
 
 # The column index of response/class variable
 resp_variable <- which(colnames(hdma_subset) == "action_taken_name")
@@ -211,7 +211,7 @@ encoded_m <- data.frame(encoded_m1, hdma_subset$action_taken_name)
 
 # We can continue from here
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-load(file = "encoded_m.Rdata")
+load(file = "data/encoded_m.Rdata")
 library(e1071)
 library(rpart)
 
@@ -230,7 +230,7 @@ test_set <- encoded_m[-train_indexes,]
 # ------ PCA + HC + KMEANS ------
 # Free memory
 gc()
-load(file = "encoded_m.Rdata")
+load(file = "data/encoded_m.Rdata")
 pca = PCA(encoded_m, quali.sup = c(which(colnames(encoded_m) == "hdma_subset.action_taken_name")), ncp=ncol(encoded_m))
 #pca = PCA(wine_quality, quali.sup = c(12), ncp=12)
 pca$eig
@@ -348,8 +348,8 @@ for (nt in ntrees)
   gc()
   ii <- ii+1
 }
-#save(rf.results, file = "rf_result.Rdata")
-load(file = "rf_result.Rdata")
+save(rf.results, file = "data/rf_result.Rdata")
+load(file = "data/rf_result.Rdata")
 
 rf.results
 (ntree.best <- 398)
@@ -381,7 +381,7 @@ for(g in gammas) {
   i <- i+1
 }
 
-#save(svm.models.gammas, file = "svm_models_gammas.Rdata")
+save(svm.models.gammas, file = "data/svm_models_gammas.Rdata")
 
 svm.predictions.gammas <- list()
 i <- 1
@@ -410,7 +410,7 @@ for(c in costs) {
   i <- i+1
 }
 
-save(svm.models.costs, file = "svm_models_costs.Rdata")
+save(svm.models.costs, file = "data/svm_models_costs.Rdata")
 
 svm.predictions.costs <- list()
 i <- 1
@@ -437,7 +437,6 @@ svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_
 
 # Best accuracy so ar is 67.2% :)
 sum(diag(svm.pred.table))/sum(svm.pred.table)
-
 
 # Cross-validation part
 library(TunePareto)
@@ -531,6 +530,12 @@ plot(nb.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
 
+# 95% CI for CV error
+pe.hat <- 0.37
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
+
 # 10 fold CROSS-VALIDATION for Random Forest
 k <- 10
 rf.cv <- model.CV(k, method = "RandomForest")
@@ -543,6 +548,12 @@ for(j in 1:k){
 plot(rf.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
+
+# 95% CI for CV error
+pe.hat <- 0.33
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
 
 # 10 fold CROSS-VALIDATION for SVM
@@ -558,10 +569,16 @@ plot(svm.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
 axis(1, at=1:20,labels=1:20, las=2)
 grid()
 
+# 95% CI for CV error
+pe.hat <- 0.32
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
+
 # Load datasets to train/test final models
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-load(file = "hdma_subset_norm.Rdata.Rdata")
-load(file = "encoded_m.Rdata")
+load(file = "data/hdma_subset_norm.Rdata.Rdata")
+load(file = "data/encoded_m.Rdata")
 library(e1071)
 library(rpart)
 
@@ -596,9 +613,8 @@ svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_
 # Best accuracy is 67%
 (sum(diag(svm.pred.table))/sum(svm.pred.table))
 
-
 # Train the big data set using Random Forest algorithm
-load(file = "hdma_processed.Rdata")
+load(file = "data/hdma_processed.Rdata")
 t_hdma <- hdma_df
 t_hdma <- subset(t_hdma, select=-c(county_name, rate_spread, co_applicant_sex_name, co_applicant_race_name_1, co_applicant_ethnicity_name))
 

@@ -1,20 +1,24 @@
 The following text contains instructions how to reproduce same results as we have obtained and described in report.
+The folder contains zipped file of original dataset, and it's necessary to unzip it, since it will extract .csv file.
 
 The code can be run from first lines in order to remove unnecessary columns, rename factors of several categorical variables, 
 and mark some values as missing data. Those are lines 1-71 of "project.R" script file. However, this dataset contains many NAs and
 in order to perform imputation we used Google Virtual Machine and run it in the cloud for around 17 hours. After imputation was performed we saved it as R object into the file hdma_cleaned.Rdata. So the whole work can be continued from here. Keep in mind that line numbers ar approximate, since it is impossible to specify exact line numbers due to the fact that code is dynamic.
 
-Step 1: load hdma_cleaned.Rdata (line 83)
-Step 2: Remove outliers for 2 numerical columns (lines 85-97)
-Step 3: Rename response variable levels and perform subsetting of original data set (lines 111-153)
-Step 4: Create 2 more categorical variables and normalize data (lines 160-190)
-Step 5: Perform onehot encoding on data frame (lines 197-206)
+Step 1: load hdma_cleaned.Rdata (line 78)
+Step 2: Remove outliers for 2 numerical columns (lines 80-92)
+Step 3: Rename response variable levels and perform subsetting of original data set (lines 106-150)
+Step 4: Create 2 more categorical variables and normalize data (lines 158-182)
+Step 5: Check for more outliers using multiple outlier function (lines 186-189)
+Step 5: Perform onehot encoding on data frame (lines 200-210)
 
 All above given steps can be skipped if we load already encoded data frame from encoded_m.Rdata file (line 210)
-
-Step 6: Split subsetted data set into training and test (80/20 ratio) (lines 211-223)
-Step 7: Run Naive Bayes classifier to find out the test error (lines 226-235)
-Step 8: Run Random Forest classifier (lines 238-276)
-Step 9: Run SVM classifier to select parameters cost and gamma and select the best one based on test errors (lines 287-355)
-Step 10: Run cross validation (lines 370-486)
-Step 11: Train final chosen models and obtain accuracy (lines 480-518)
+	
+Step 6: Split subsetted data set into training and test (80/20 ratio) (lines 218-226)
+Step 7: Perform Data Visualization (PCA+HC+KMEANS) (lines 229-293)
+Step 8: Run Naive Bayes classifier to find out the test error (lines 299-308)
+Step 9: Run Random Forest classifier (lines 311-367)
+Step 10: Run SVM classifier to select parameters cost and gamma and select the best one based on test errors (lines 370-439)
+Step 11: Run cross validation (lines 441-576)
+Step 12: Train final chosen models with 30k dataset and obtain accuracy (lines 579-615)
+Step 13: Train the full data set using Random Forest Algorithm (lines 617-)
