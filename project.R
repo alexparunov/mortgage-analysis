@@ -326,7 +326,7 @@ for(i in 1:length(svm.predictions.gammas)) {
 costs <- 10^seq(0,3, by = 0.5)
 svm.models.costs <- list()
 
-# Train for various costs for RBF kernel SVC, keepig gamma = 0.05 and costs varying.
+# Train for various costs for RBF kernel SVC, keeping gamma = 0.05 and costs varying.
 i <- 1
 for(c in costs) {
   svm.model <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, 
