@@ -12,6 +12,7 @@ setwd(dirname(getActiveDocumentContext()$path))
 # Read data frame
 hdma_df <- read.csv("Washington_State_HDMA-2016.csv")
 dim(hdma_df)
+summary(hdma_df)
 
 remove_columns <- function(hdma_df, column_names) {
   for(cn in column_names) {
@@ -351,21 +352,20 @@ for (nt in ntrees)
 load(file = "rf_result.Rdata")
 
 rf.results
-(ntrees.best <- 398)
+(ntree.best <- 398)
 
 model.rf3 <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=ntree.best, proximity=FALSE)
 pred.rf3 <- predict (model.rf3, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
 
 (ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf3))
-#model.rf
-# Variable's importance, if we eliminate the least important variablem, the error rate increases.
-varImpPlot(pred.rf3)
-
 # percent by class
 prop.table(ct, 1)
 # total percent correct
 sum(diag(ct))/sum(ct)
+#model.rf
 
+# Variable's importance, if we eliminate the least important variablem, the error rate increases.
+varImpPlot(model.rf3)
 
 # Support Vector Classifier
 gammas <- 2^seq(-3,4)
