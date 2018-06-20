@@ -1,24 +1,25 @@
-The following text contains instructions how to reproduce same results as we have obtained and described in report.
-The folder contains zipped file of original dataset, and it's necessary to unzip it, since it will extract .csv file.
+The following text contains instructions on how to reproduce same results as we have obtained and described in report.
+
+***The folder contains zipped file of original dataset, and it's necessary to unzip it, since it will extract .csv file (256 MB).***
 
 The code can be run from first lines in order to remove unnecessary columns, rename factors of several categorical variables, 
 and mark some values as missing data. Those are lines 1-71 of "project.R" script file. However, this dataset contains many NAs and
-in order to perform imputation we used Google Virtual Machine and run it in the cloud for around 17 hours. After imputation was performed we saved it as R object into the file hdma_cleaned.Rdata. So the whole work can be continued from here. Keep in mind that line numbers ar approximate, since it is impossible to specify exact line numbers due to the fact that code is dynamic.
+in order to perform imputation we used Google Virtual Machine and run it in the cloud for around 17 hours. After imputation was performed we saved it as R object into the file hdma_cleaned.Rdata. So the whole work can be continued from here. We also commented the commands related to save file since it's not necessary. 
 
-Step 1: load hdma_cleaned.Rdata (line 78)
+Step 1: load hdma_cleaned.Rdata (line 79)
 Step 2: Remove outliers for 2 numerical columns (lines 80-92)
-Step 3: Rename response variable levels and perform subsetting of original data set (lines 106-150)
+Step 3: Rename response variable levels and perform subsetting of original data set (lines 107-150)
 Step 4: Create 2 more categorical variables and normalize data (lines 158-182)
-Step 5: Check for more outliers using multiple outlier function (lines 186-189)
+Step 5: Check for more outliers using multiple outlier function (lines 186-190)
 Step 5: Perform onehot encoding on data frame (lines 200-210)
 
-All above given steps can be skipped if we load already encoded data frame from encoded_m.Rdata file (line 210)
+All above given steps can be skipped if we load hdma_subset_norm.Rdata file (line 198) and already encoded data frame from encoded_m.Rdata file (line 214)
 	
-Step 6: Split subsetted data set into training and test (80/20 ratio) (lines 218-226)
-Step 7: Perform Data Visualization (PCA+HC+KMEANS) (lines 229-293)
-Step 8: Run Naive Bayes classifier to find out the test error (lines 299-308)
+Step 6: Split subsetted data set into training and test (80/20 ratio) (lines 215-227)
+Step 7: Perform Data Visualization (PCA+HC+KMEANS) (lines 230-295)
+Step 8: Run Naive Bayes classifier to find out the test error (lines 299-310)
 Step 9: Run Random Forest classifier (lines 311-367)
-Step 10: Run SVM classifier to select parameters cost and gamma and select the best one based on test errors (lines 370-439)
-Step 11: Run cross validation (lines 441-576)
-Step 12: Train final chosen models with 30k dataset and obtain accuracy (lines 579-615)
-Step 13: Train the full data set using Random Forest Algorithm (lines 617-)
+Step 10: Run SVM classifier to select parameters cost and gamma and select the best one based on test errors (lines 373-442)
+Step 11: Run cross validation (lines 445-556)
+Step 12: Train final chosen models with 30k dataset and obtain accuracy (lines 558-603)
+Step 13: Train the full data set using Random Forest Algorithm (lines 604-633)
