@@ -263,7 +263,6 @@ cdg <- aggregate(Psi,list(c3),mean)[,2:(nd+1)]
 Bss <- sum(rowSums(cdg^2)*as.numeric(table(c3)))
 Tss <- sum(rowSums(Psi^2))
 (optimization.criterion.before <- 100*Bss/Tss)
-
 iden <- rownames(Psi)
 par(mfrow=c(1,1))
 plot(Psi[,1],Psi[,2],type="p",main="Clustering with HC", col=c3, xlab = "Dim. 1", ylab = "Dim. 2")
