@@ -187,7 +187,7 @@ for(i in 1:8) {
 # Restore plot style
 par(mfrow=c(1,1))
 
-save(hdma_subset, file = "hdma_subset_norm.Rdata")
+#save(hdma_subset, file = "hdma_subset_norm.Rdata")
 
 # This data frame can be used for classifications algorithms
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
@@ -476,7 +476,7 @@ grid()
 # 10 fold CROSS-VALIDATION for SVM
 k <- 10
 svm.cv <- model.CV(k, method = "SVM")
-
+svm.cv.df <- as.data.frame(svm.cv[10])
 # plot result for mean VA error for each fold [1-10]
 svm.mean.cv <- vector(mode = "numeric",length = k)
 for(j in 1:k){
