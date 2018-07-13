@@ -12,6 +12,7 @@ setwd(dirname(getActiveDocumentContext()$path))
 # Read data frame
 hdma_df <- read.csv("data/Washington_State_HDMA-2016.csv")
 dim(hdma_df)
+summary(hdma_df)
 
 remove_columns <- function(hdma_df, column_names) {
   for(cn in column_names) {
@@ -70,7 +71,7 @@ hdma_df$applicant_income_000s[hdma_df$applicant_income_000s == 9999] <- NA
 hdma_df$owner_occupancy_name[is.na(hdma_df$owner_occupancy_name)] <- NA
 
 # Save pre-processed data frame for future uses, so we can skip above given lines
-save(hdma_df, file = "data/hdma_processed.Rdata")
+#save(hdma_df, file = "data/hdma_processed.Rdata")
 
 # Load data frame which contains no NA's. The imputation was done on Google Virtual Machine since it took around 17hours
 # The below given dataframe is ready to be worked on.
@@ -89,7 +90,7 @@ income_outliers <- boxplot.stats(hdma_df$applicant_income_000s)$out
 hdma_df <- hdma_df[hdma_df$applicant_income_000s < min(income_outliers),]
 
 # save file for future usage
-save(hdma_df, file = "data/hdma_processed.Rdata")
+#save(hdma_df, file = "data/hdma_processed.Rdata")
 
 # Load file to continue work
 load(file = "data/hdma_processed.Rdata")
@@ -147,7 +148,7 @@ originated_subset <- originated_subset[sample(nrow(originated_subset), 30000-nro
 hdma_subset <- rbind(originated_subset, hdma_subset)
 
 # Save subset
-save(hdma_subset, file = "data/hdma_subset.Rdata")
+#save(hdma_subset, file = "data/hdma_subset.Rdata")
 
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
 
@@ -227,6 +228,7 @@ test_set <- encoded_m[-train_indexes,]
 
 
 # ------ PCA + HC + KMEANS ------
+library(FactoMineR)
 # Free memory
 gc()
 load(file = "data/encoded_m.Rdata")
@@ -261,7 +263,6 @@ cdg <- aggregate(Psi,list(c3),mean)[,2:(nd+1)]
 Bss <- sum(rowSums(cdg^2)*as.numeric(table(c3)))
 Tss <- sum(rowSums(Psi^2))
 (optimization.criterion.before <- 100*Bss/Tss)
-
 iden <- rownames(Psi)
 par(mfrow=c(1,1))
 plot(Psi[,1],Psi[,2],type="p",main="Clustering with HC", col=c3, xlab = "Dim. 1", ylab = "Dim. 2")
@@ -347,25 +348,25 @@ for (nt in ntrees)
   gc()
   ii <- ii+1
 }
-save(rf.results, file = "data/rf_result.Rdata")
+
+#save(rf.results, file = "data/rf_result.Rdata")
 load(file = "data/rf_result.Rdata")
 
 rf.results
-(ntrees.best <- 398)
+(ntree.best <- 398)
 
 model.rf3 <- randomForest(action_taken_name~ ., data=hdma_subset[train_indexes,], ntree=ntree.best, proximity=FALSE)
 pred.rf3 <- predict (model.rf3, hdma_subset[-train_indexes, -which(colnames(hdma_subset) == "action_taken_name")], type="class")
 
 (ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf3))
-#model.rf
-# Variable's importance, if we eliminate the least important variablem, the error rate increases.
-varImpPlot(pred.rf3)
-
 # percent by class
 prop.table(ct, 1)
 # total percent correct
-sum(diag(ct))/sum(ct)
+1-sum(diag(ct))/sum(ct)
+#model.rf
 
+# Variable's importance, if we eliminate the least important variablem, the error rate increases.
+varImpPlot(model.rf3)
 
 # Support Vector Classifier
 gammas <- 2^seq(-3,4)
@@ -381,8 +382,7 @@ for(g in gammas) {
   i <- i+1
 }
 
-save(svm.models.gammas, file = "data/svm_models_gammas.Rdata")
-
+#save(svm.models.gammas, file = "data/svm_models_gammas.Rdata")
 svm.predictions.gammas <- list()
 i <- 1
 for(svm.model in svm.models.gammas) {
@@ -410,7 +410,7 @@ for(c in costs) {
   i <- i+1
 }
 
-save(svm.models.costs, file = "data/svm_models_costs.Rdata")
+#save(svm.models.costs, file = "data/svm_models_costs.Rdata")
 
 svm.predictions.costs <- list()
 i <- 1
@@ -430,6 +430,8 @@ for(i in 1:length(svm.predictions.costs)) {
 # After training and testing with various costs and gammas, error is suboptimal with gamma = 0.05 and cost = 10
 # However increase of cost doesn't affect error as much as increase of gamma. Keeping gamma 0.05 is good choice,
 # because we can't make it too small, it will take more time to train.
+train_set <- encoded_m[train_indexes,]
+test_set <- encoded_m[-train_indexes,]
 
 svm.optimal <- svm(hdma_subset.action_taken_name ~ ., data = train_set, scale = FALSE, kernel = "radial", gamma = 0.05, cost = 10)
 svm.optimal.preds <- predict(svm.optimal, test_set[,-ncol(encoded_m)])
@@ -438,7 +440,7 @@ svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_
 # Best accuracy so ar is 67.2% :)
 sum(diag(svm.pred.table))/sum(svm.pred.table)
 
-# Cross-validation part
+# ------ Cross-validation part ------
 library(TunePareto)
 library(randomForest)
 library(e1071)
@@ -521,18 +523,10 @@ model.CV <- function (k, method) {
 k <- 10
 nb.cv <- model.CV(k, method = "NaiveBayes")
 nb.cv.df <- as.data.frame(nb.cv[10]) 
-# plot result for mean VA error for each fold [1-10]
-nb.mean.cv <- vector(mode = "numeric",length = k)
-for(j in 1:k){
-  nb.mean.cv[j] <- mean(nb.cv[[j]][,"VA error"])
-}
-plot(nb.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
-axis(1, at=1:20,labels=1:20, las=2)
-grid()
 
 # 95% CI for CV error
 pe.hat <- 0.37
-dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(24000*0.1))*1.967
 
 sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
@@ -540,18 +534,10 @@ sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 k <- 10
 rf.cv <- model.CV(k, method = "RandomForest")
 rf.cv.df <- as.data.frame(rf.cv[10])
-# plot result for mean VA error for each fold [1-10]
-rf.mean.cv <- vector(mode = "numeric",length = k)
-for(j in 1:k){
-  rf.mean.cv[j] <- mean(rf.cv[[j]][,"VA error"])
-}
-plot(rf.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
-axis(1, at=1:20,labels=1:20, las=2)
-grid()
 
 # 95% CI for CV error
 pe.hat <- 0.33
-dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(24000*0.1))*1.967
 
 sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
@@ -561,23 +547,16 @@ k <- 10
 svm.cv <- model.CV(k, method = "SVM")
 svm.cv.df <- as.data.frame(svm.cv[10])
 # plot result for mean VA error for each fold [1-10]
-svm.mean.cv <- vector(mode = "numeric",length = k)
-for(j in 1:k){
-  svm.mean.cv[j] <- mean(rb.cv[[j]][,"VA error"])
-}
-plot(svm.mean.cv,type="b",xlab="Value of k",ylab="Average CV error", xaxt="n")
-axis(1, at=1:20,labels=1:20, las=2)
-grid()
 
 # 95% CI for CV error
 pe.hat <- 0.32
-dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.8))*1.967
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(24000*0.1))*1.967
 
 sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
-# Load datasets to train/test final models
+#  ------ Load datasets to train/test final models ------
 setwd(dirname(rstudioapi::getActiveDocumentContext()$path))
-load(file = "data/hdma_subset_norm.Rdata.Rdata")
+load(file = "data/hdma_subset_norm.Rdata")
 load(file = "data/encoded_m.Rdata")
 library(e1071)
 library(rpart)
@@ -595,13 +574,16 @@ test_set <- encoded_m[-train_indexes,]
 
 # Random Forest Classifier
 set.seed(788)
-model.rf <- randomForest(action_taken_name ~ ., data = hdma_subset[train_indexes,], ntree=400, proximity=FALSE)
+model.rf <- randomForest(action_taken_name ~ ., data = hdma_subset[train_indexes,], ntree=398, proximity=FALSE)
 
 pred.rf <- predict (model.rf, hdma_subset[-train_indexes,], type="class")
 ct <- table(Truth=hdma_subset[-train_indexes,]$action_taken_name, Pred=pred.rf)
 
 # Best accuracy is 66%
-(sum(diag(ct))/sum(ct))
+pe.hat <- 1-sum(diag(ct))/sum(ct)
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.2))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
 
 # SV Classifier
 
@@ -613,7 +595,12 @@ svm.pred.table <- table(pred = svm.optimal.preds, true = test_set[,ncol(encoded_
 # Best accuracy is 67%
 (sum(diag(svm.pred.table))/sum(svm.pred.table))
 
-# Train the big data set using Random Forest algorithm
+pe.hat <- 1-sum(diag(svm.pred.table))/sum(svm.pred.table)
+dev <- sqrt(pe.hat*(1-pe.hat)/floor(30000*0.2))*1.967
+
+sprintf("(%f,%f)", pe.hat-dev,pe.hat+dev)
+
+# ------ Aditional part: Train the big data set using Random Forest algorithm ------
 load(file = "data/hdma_processed.Rdata")
 t_hdma <- hdma_df
 t_hdma <- subset(t_hdma, select=-c(county_name, rate_spread, co_applicant_sex_name, co_applicant_race_name_1, co_applicant_ethnicity_name))
